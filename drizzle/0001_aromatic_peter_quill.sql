@@ -1,0 +1,1 @@
+ALTER TABLE `loans` ADD `message_template` text DEFAULT '' NOT NULL;

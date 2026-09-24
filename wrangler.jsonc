@@ -1,0 +1,25 @@
+{
+  "name": "cartera-papa",
+  "main": "vinext/server/fetch-handler",
+  "assets": {
+    "directory": "dist/client"
+  },
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cartera-papa",
+      "database_id": "REEMPLAZAR_CON_ID_D1",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "cartera-documentos"
+    }
+  ]
+}
