@@ -50,6 +50,13 @@
       "when": 1790134599838,
       "tag": "0006_messy_katie_power",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791608000000,
+      "tag": "0007_integridad_cobranza",
+      "breakpoints": true
     }
   ]
 }
