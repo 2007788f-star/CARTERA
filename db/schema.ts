@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, uniqueIndex, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const loans = sqliteTable("loans", {
   id: text("id").primaryKey(), owner: text("owner").notNull(), borrowerId: text("borrower_id"), name: text("name").notNull(),
@@ -13,14 +13,24 @@ export const loans = sqliteTable("loans", {
   sourceRef: text("source_ref").unique(),
   scheduleKnown: integer("schedule_known").notNull().default(1),
   createdAt: text("created_at").notNull(),
-});
+  principalCents: integer("principal_cents").notNull().default(0),
+  disbursedAt: text("disbursed_at"), maturityDate: text("maturity_date"),
+  installmentMode: text("installment_mode").notNull().default("contractual"),
+  closedAt: text("closed_at"), operationKey: text("operation_key"), requestHash: text("request_hash"), changeToken: text("change_token").notNull().default(""),
+  revision: integer("revision").notNull().default(0), changeReason: text("change_reason").notNull().default(""),
+},t=>[uniqueIndex("loans_operation").on(t.owner,t.operationKey),index("loans_borrower_owner").on(t.borrowerId,t.owner)]);
 export const payments = sqliteTable("payments", {
   id: text("id").primaryKey(), loanId: text("loan_id").notNull().references(() => loans.id),
   owner: text("owner").notNull(), amount: real("amount").notNull(),
   allocation: text("allocation").notNull().default("combined"),
   paidAt: text("paid_at").notNull(), note: text("note").notNull(),
   sourceRef: text("source_ref").unique(),
-});
+  amountCents: integer("amount_cents").notNull().default(0),
+  principalCents: integer("principal_cents").notNull().default(0),
+  interestCents: integer("interest_cents").notNull().default(0),
+  operationKey: text("operation_key"), requestHash: text("request_hash"), voidedAt: text("voided_at"),
+  revision: integer("revision").notNull().default(0), changeReason: text("change_reason").notNull().default(""),
+},t=>[uniqueIndex("payments_operation").on(t.owner,t.operationKey),index("payments_loan_owner").on(t.loanId,t.owner,t.paidAt)]);
 export const sourceEntries = sqliteTable("source_entries", {
   id: text("id").primaryKey(), owner: text("owner").notNull(),
   source: text("source").notNull(), sourceCell: text("source_cell").notNull(),
@@ -53,3 +63,10 @@ export const borrowers = sqliteTable("borrowers", {
   id:text("id").primaryKey(), owner:text("owner").notNull().references(()=>users.id),
   name:text("name").notNull(), phone:text("phone").notNull(), createdAt:text("created_at").notNull(),
 });
+
+export const auditEvents = sqliteTable("audit_events", {
+ id:text("id").primaryKey(), owner:text("owner").notNull(), loanId:text("loan_id").notNull(),
+ entityType:text("entity_type").notNull(), entityId:text("entity_id").notNull(), action:text("action").notNull(),
+ beforeJson:text("before_json"), afterJson:text("after_json").notNull(), reason:text("reason").notNull(),
+ changedAt:text("changed_at").notNull(),
+},t=>[index("audit_events_loan").on(t.owner,t.loanId,t.changedAt)]);

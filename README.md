@@ -80,3 +80,106 @@ prueba. No usar esa cuenta de prueba en producción.
 - Importar y conciliar los datos reales; no están en este repositorio.
 - La instalación actual es una aplicación web: todavía no se ha generado APK.
 - Los cobros mixtos requieren clasificación; no se infiere su parte de capital.
+
+
+## Cobranza e integridad (octubre de 2026)
+
+El panel agrupa por persona, conserva el detalle de cada préstamo y muestra:
+capital pendiente, importe exigible al corte (atrasado + vence hoy), atraso,
+primer cobro pendiente, cobros recibidos, interés identificado, importes por
+conciliar y porcentaje de capital recuperado. Incluye filtros por vencimiento,
+atraso, próximos siete días, liquidación y revisión. Los reportes y expedientes
+usan el mismo cálculo. La actualización se realiza al recuperar foco y cada
+45 segundos mientras la aplicación esté visible.
+
+### Aplicación de pagos
+
+- Capital: reduce el capital pendiente; en préstamos sin interés también cubre cuotas.
+- Interés: cubre cargos periódicos en préstamos con interés; no reduce capital.
+- Capital e interés: se capturan ambas partes y su suma debe coincidir con el cobro.
+- Sin desglose / por confirmar: queda pendiente de conciliación; no confirma cuotas.
+
+El importe del último cobro y de los recordatorios corresponde al saldo real,
+no a la cuota original. No se generan recordatorios si hay datos por revisar,
+si el préstamo está liquidado o si está cerrado. WhatsApp requiere que el
+usuario revise y envíe el mensaje.
+
+### Modalidades de acuerdo
+
+Se conserva la modalidad **cuota pactada** de los préstamos anteriores. En
+préstamos con interés, esa cuota es el cargo de interés por fecha; los abonos
+a capital se registran por separado. Para un acuerdo basado en porcentaje,
+seleccionar **interés mensual dividido por periodo**:
+
+- El cargo mensual manual tiene prioridad sobre la tasa.
+- Tasa sobre capital inicial: usa el capital original.
+- Tasa sobre saldo: usa el capital pendiente antes del día del vencimiento.
+- Calendario 15/fin de mes: reparte el cargo mensual entre ambas fechas,
+  conservando el centavo restante en el fin de mes.
+- Intervalo: cargo mensual × días del intervalo ÷ 30, redondeado a centavos.
+- No se capitalizan intereses ni se cobran intereses moratorios automáticamente.
+- La primera fecha es una fecha de cargo pactada; no se prorratea un periodo
+  inicial incompleto. La fecha de entrega permite validar el orden de los cobros.
+- Al devolver el capital completo se detienen cargos posteriores a ese día;
+  los cargos de esa fecha y anteriores deben quedar pagados para liquidar.
+- El vencimiento final opcional exige todo el capital restante y detiene
+  nuevos cargos periódicos después de esa fecha.
+
+Son reglas explícitas del sistema que deben coincidir con el acuerdo real.
+No se infieren condiciones a partir de una nota libre. Las cuotas y acuerdos
+con movimientos ya confirmados no se reescriben retroactivamente. Una
+renegociación se registra como nuevo acuerdo, conservando el anterior.
+Los calendarios importados aún desconocidos pueden confirmarse desde Editar.
+
+### Correcciones y trazabilidad
+
+Movimientos permite corregir monto, fecha, nota y aplicación con motivo. Una
+anulación conserva el original y lo excluye de saldos. Para un préstamo
+seleccionado por error, anular y registrar el cobro en el correcto. La bitácora
+muestra antes/después de pagos, condiciones, datos de la persona y cierres.
+Se conserva también en la base mediante triggers atómicos. Las versiones
+impiden que un dispositivo sobrescriba cambios de otro.
+
+Los reintentos de alta usan una clave de idempotencia. El navegador conserva
+la clave de una operación pendiente en la pestaña: después de un fallo de red,
+volver a enviar los mismos datos reutiliza la operación y no duplica el cobro.
+Un nuevo envío legítimo obtiene otra clave después de confirmar el anterior.
+
+### Actualización de una instalación existente
+
+La migración `0007_integridad_cobranza.sql` agrega importes enteros en centavos,
+partes de capital/interés, idempotencia, versiones, fechas y bitácora. Conserva
+las tablas y movimientos anteriores; **no corrige ni elimina automáticamente
+los sobreabonos históricos**. El panel los marca para revisión. No hacer
+escrituras con una versión anterior del servidor tras aplicar esta migración:
+las nuevas protecciones exigirán los campos en centavos.
+
+Antes de actualizar producción, exportar D1, conservar R2, detener capturas,
+aplicar las migraciones pendientes y desplegar esta versión en la misma ventana.
+Verificar saldos y acceso antes de reabrir capturas. Los backups son necesarios
+para volver al servidor anterior; no basta desplegar su código tras migrar.
+El ID de D1 del repositorio sigue siendo un marcador: la configuración real
+se realiza en la cuenta de Cloudflare de la familia. No se ha publicado una
+instancia ni cargado datos reales con estas pruebas.
+
+### Pruebas
+
+```sh
+npm ci
+npm run typecheck
+npm test
+npm run build
+npm run db:migrate:local
+# .dev.vars contiene una SETUP_KEY local ficticia, nunca una clave real.
+npm run test:api
+npx playwright install chromium
+npm run test:browser
+```
+
+Las pruebas de navegador crean préstamos ficticios de una persona nueva y
+existente, cobran, revisan el importe efectivo del recordatorio, corrigen el
+movimiento, usan filtros y revisan la consolidación del reporte en 390 y 1365 px.
+Ejecutarlas únicamente en una base local descartable. No usar la cuenta de
+prueba en producción. La prueba API cubre también concurrencia, reintentos,
+fechas futuras, desglose, anulación, edición atómica, conflictos de versión,
+cierre/reapertura y privacidad. Las pruebas no envían mensajes de WhatsApp.
