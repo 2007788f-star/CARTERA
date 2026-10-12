@@ -1,4 +1,4 @@
-import {type State,audit,StoreError} from './excel-store';
+import {type State,audit,StoreError} from './portfolio-state';
 import {cents,today,type Loan,type Payment} from './portfolio';
 import {loanStatus} from './loan-schedule';
 import {termsSchema,termErrors,financialKeys,validationError,positiveMoney,moneyAmount,receivedDate} from './validation';
