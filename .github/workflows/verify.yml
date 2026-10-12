@@ -14,6 +14,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - run: node scripts/build-google.mjs
+      - run: node scripts/test-google.mjs
       - run: npm run build
       - run: npm run db:migrate:local
       - name: Preparar clave local desechable
