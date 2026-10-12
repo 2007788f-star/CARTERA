@@ -34,6 +34,19 @@ try{
  const unauthorized=await fetch(base+`/api/documents/${doc.id}`);assert.equal(unauthorized.status,401);
  r=await api(`/api/documents/${doc.id}`,'DELETE');assert.equal(r.status,200);
 
+ // Two personal accesses see the same Excel, with attribution and restricted access management.
+ const primaryCookie=cookie;
+ r=await api('/api/auth/administrators','POST',{action:'secondary',email:'segundo@example.com',password:'Segundo-local-2026-seguro',currentPassword:credentials.password});assert.equal(r.status,200);
+ r=await api('/api/auth/login','POST',{email:'segundo@example.com',password:'Segundo-local-2026-seguro'});assert.equal(r.status,200);cookie=r.headers.get('set-cookie').split(';')[0];
+ let shared=await (await api('/api/portfolio')).json();assert.ok(shared.loans.some(l=>l.id===loan.id));
+ r=await api('/api/payments','POST',{loanId:second.id,amount:1,paidAt:'2026-01-15',allocation:'principal',note:'Segundo administrador'});assert.equal(r.status,201);
+ r=await api(`/api/loans/${second.id}/audit`);assert.ok((await r.json()).some(a=>a.actor==='secondary'));
+ r=await api('/api/auth/administrators','POST',{action:'secondary',email:'tercero@example.com',password:'Tercero-local-2026-seguro',currentPassword:'Segundo-local-2026-seguro'});assert.equal(r.status,403);
+ r=await api('/api/excel');assert.equal(r.status,200);const excelBytes=new Uint8Array(await r.arrayBuffer());assert.equal(excelBytes[0],80);assert.equal(excelBytes[1],75);
+ assert.equal((await fetch(base+'/api/excel')).status,401);
+ cookie=primaryCookie;shared=await (await api('/api/portfolio')).json();assert.ok(shared.payments.some(p=>p.loanId===second.id&&p.note==='Segundo administrador'));
+ console.log('PASS: two administrators share Excel, actor history, private download and restricted account management');
+
  // Integrity and collection regression tests. Never use remote data.
  const loanData={...payload,operationKey:crypto.randomUUID(),principal:100};
  r=await api('/api/loans','POST',loanData);assert.equal(r.status,201);const race=await r.json();

@@ -1,15 +1,9 @@
-import { env } from "cloudflare:workers";
-import { getDb } from "@/db";
-import { documents } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
-import { getPortfolioOwner,sameOrigin } from "@/app/owner";
-async function record(id:string,owner:string){const found=await getDb().select().from(documents).where(and(eq(documents.id,id),eq(documents.owner,owner))).limit(1);return found[0]}
+import {env} from 'cloudflare:workers';
+import {getPortfolioOwner,getCurrentUser,sameOrigin} from '@/app/owner';
+import {readState,changeState,audit,excelError,StoreError} from '@/lib/excel-store';
 export async function GET(_req:Request,{params}:{params:Promise<{id:string}>}){
- const owner=await getPortfolioOwner();if(!owner)return new Response(null,{status:401});const {id}=await params;const doc=await record(id,owner);if(!doc)return new Response(null,{status:404});
+ const owner=await getPortfolioOwner();if(!owner)return new Response(null,{status:401});const {id}=await params;const doc=(await readState()).documents.find(d=>d.id===id);if(!doc)return new Response(null,{status:404});
  const object=await env.BUCKET?.get(doc.objectKey);if(!object)return new Response(null,{status:404});
  return new Response(object.body,{headers:{"Content-Type":doc.mimeType,"Content-Disposition":`inline; filename*=UTF-8''${encodeURIComponent(doc.filename)}`,"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff","Content-Security-Policy":"sandbox"}});
 }
-export async function DELETE(req:Request,{params}:{params:Promise<{id:string}>}){
- const owner=await getPortfolioOwner();if(!owner)return Response.json({error:"Sesión requerida"},{status:401});if(!sameOrigin(req))return Response.json({error:"Solicitud rechazada"},{status:403});const {id}=await params;const doc=await record(id,owner);if(!doc)return Response.json({error:"Documento no encontrado"},{status:404});
- await env.BUCKET?.delete(doc.objectKey);await getDb().delete(documents).where(and(eq(documents.id,id),eq(documents.owner,owner)));return Response.json({ok:true});
-}
+export async function DELETE(req:Request,{params}:{params:Promise<{id:string}>}){const actor=await getCurrentUser();if(!actor)return Response.json({error:'Sesión requerida'},{status:401});if(!sameOrigin(req))return Response.json({error:'Solicitud rechazada'},{status:403});try{const {id}=await params;await changeState(s=>{const d=s.documents.find(x=>x.id===id);if(!d)throw new StoreError('Documento no encontrado',404);s.documents=s.documents.filter(x=>x.id!==id);audit(s,actor,d.loanId,id,d,{archived:true,objectKey:d.objectKey},'Documento retirado del expediente','document_archive');});return Response.json({ok:true});}catch(e){return excelError(e);}}

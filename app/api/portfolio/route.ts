@@ -1,5 +1,3 @@
-import { getPortfolioOwner } from '@/app/owner';
-import { getDb } from '@/db';
-import { loans,payments,sourceEntries } from '@/db/schema';
-import { eq } from 'drizzle-orm';
-export async function GET(){const owner=await getPortfolioOwner();if(!owner)return Response.json({error:'Sesión requerida'},{status:401});try{const db=getDb();const [allLoans,allPayments,allSourceEntries]=await Promise.all([db.select().from(loans).where(eq(loans.owner,owner)),db.select().from(payments).where(eq(payments.owner,owner)),db.select().from(sourceEntries).where(eq(sourceEntries.owner,owner))]);return Response.json({loans:allLoans,payments:allPayments,sourceEntries:allSourceEntries},{headers:{'Cache-Control':'no-store'}});}catch{return Response.json({error:'No se pudo actualizar la cartera'},{status:500});}}
+import {getPortfolioOwner} from '@/app/owner';
+import {readState,excelError} from '@/lib/excel-store';
+export async function GET(){if(!await getPortfolioOwner())return Response.json({error:'Sesión requerida'},{status:401});try{const s=await readState();return Response.json({loans:s.loans,payments:s.payments,sourceEntries:s.sourceEntries},{headers:{'Cache-Control':'no-store'}});}catch(e){return excelError(e);}}
